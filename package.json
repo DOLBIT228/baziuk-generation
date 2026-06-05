@@ -1,7 +1,7 @@
 {
   "name": "baziuk-generation",
   "version": "0.1.0",
-  "description": "MVP image generation service with OpenRouter, admin access, gallery and cost tracking.",
+  "description": "Release-ready image generation service with OpenRouter, chat history, profile access and style management.",
   "type": "module",
   "main": "server.js",
   "scripts": {
@@ -15,7 +15,7 @@
   "keywords": [
     "openrouter",
     "image-generation",
-    "mvp"
+    "release"
   ],
   "license": "MIT"
 }

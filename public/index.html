@@ -3,148 +3,142 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>ImageGen MVP</title>
+    <title>Baziuk Generation</title>
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
     <header class="header">
-      <div class="logo"><span class="logo-mark">✦</span><span>ImageGen</span></div>
-      <nav class="nav">
-        <a href="#home">Головна</a>
-        <a href="#gallery-section">Галерея</a>
-        <a href="#prices">Ціни</a>
-        <a href="#about">Про нас</a>
-        <a href="#faq">FAQ</a>
-      </nav>
+      <button id="homeLink" class="logo" type="button" aria-label="Baziuk Generation">
+        <span class="logo-mark">✦</span><span>Baziuk Generation</span>
+      </button>
       <div class="actions">
-        <button class="icon-button" aria-label="Theme">☼</button>
         <button id="loginOpen" class="secondary">Увійти</button>
-        <button id="logoutBtn" class="secondary hidden">Вийти</button>
-        <button id="adminLink" class="primary hidden">Адмінка</button>
+        <button id="profileLink" class="primary hidden">Профіль</button>
+        <button id="logoutBtn" class="secondary hidden">Вийти з профіля</button>
       </div>
     </header>
 
-    <main id="home" class="container">
-      <section class="hero">
-        <form id="generateForm" class="card form-card">
-          <div class="field">
-            <div class="field-row">
-              <label for="prompt">Опис зображення</label>
-              <span id="counter" class="counter">0/1000</span>
-            </div>
-            <textarea id="prompt" maxlength="1000" placeholder="Опишіть зображення, яке ви хочете згенерувати..."></textarea>
+    <main id="landingPage" class="landing container">
+      <section class="landing-hero">
+        <div class="landing-copy">
+          <span class="eyebrow">AI visual studio для готових релізних продуктів</span>
+          <h1>Створюйте, редагуйте та зберігайте візуали в одному робочому просторі.</h1>
+          <p>Baziuk Generation поєднує чатову генерацію, історію проєктів, завантаження власних референсів і профіль керування доступами.</p>
+          <div class="landing-actions">
+            <button id="landingLogin" class="primary big">Увійти та почати</button>
+            <button id="landingDemo" class="secondary big">Переглянути можливості</button>
           </div>
-
-          <div class="field">
-            <label for="model">Модель</label>
-            <select id="model" disabled>
-              <option>Gemini 3 Pro Image Preview</option>
-            </select>
-            <div class="hint">OpenRouter: google/gemini-3-pro-image-preview</div>
-          </div>
-
-          <div class="field">
-            <label>Співвідношення сторін</label>
-            <div id="ratios" class="ratio-grid">
-              <button type="button" class="ratio active" data-ratio="1:1"><span class="ratio-shape"></span>1:1</button>
-              <button type="button" class="ratio" data-ratio="16:9"><span class="ratio-shape"></span>16:9</button>
-              <button type="button" class="ratio" data-ratio="9:16"><span class="ratio-shape"></span>9:16</button>
-              <button type="button" class="ratio" data-ratio="4:3"><span class="ratio-shape"></span>4:3</button>
-              <button type="button" class="ratio" data-ratio="3:4"><span class="ratio-shape"></span>3:4</button>
-            </div>
-          </div>
-
-          <div class="field">
-            <label for="imageSize">Роздільна здатність</label>
-            <select id="imageSize">
-              <option value="1K">1024 × 1024 (1K)</option>
-              <option value="2K">2K</option>
-              <option value="4K">4K</option>
-            </select>
-            <div class="hint">Передається в image_config.image_size</div>
-          </div>
-
-          <div class="field">
-            <label for="count">Кількість зображень</label>
-            <div class="range-row">
-              <div>
-                <input id="count" type="range" min="1" max="4" value="1" />
-                <div class="range-labels"><span>1</span><span>4</span></div>
-              </div>
-              <input id="countNumber" type="number" min="1" max="4" value="1" />
-            </div>
-          </div>
-
-          <div class="field">
-            <label for="style">Стиль <span class="hint">(необов'язково)</span></label>
-            <select id="style">
-              <option value="">Оберіть стиль</option>
-              <option>Комерційний банер</option>
-              <option>Реалістична фотографія</option>
-              <option>Мінімалістичний UI</option>
-              <option>3D ілюстрація</option>
-              <option>Кінематографічний</option>
-            </select>
-          </div>
-
-          <div class="field">
-            <label for="referenceImage">Правки до зображення</label>
-            <select id="referenceImage">
-              <option value="">Нове зображення без референсу</option>
-            </select>
-            <div class="hint">Оберіть попередній дизайн і опишіть потрібні правки в промті.</div>
-          </div>
-
-          <button id="generateBtn" class="generate" type="submit">✦ Згенерувати зображення</button>
-        </form>
-
-        <section class="card stage">
-          <div id="dropzone" class="dropzone">
-            <div>
-              <div class="placeholder-icon">▧</div>
-              <h1>Ваше зображення з'явиться тут</h1>
-              <p>Опишіть бажане зображення в полі зліва<br />та натисніть «Згенерувати зображення»</p>
-            </div>
-          </div>
-          <div id="results" class="result-grid hidden"></div>
-        </section>
-      </section>
-
-      <section id="prices" class="card features">
-        <div class="feature"><span class="feature-icon">ϟ</span><div><b>Швидка генерація</b><span>OpenRouter API + локальне збереження</span></div></div>
-        <div class="feature"><span class="feature-icon">⬡</span><div><b>Висока якість</b><span>Gemini 3 Pro Image Preview</span></div></div>
-        <div class="feature"><span class="feature-icon">▣</span><div><b>Облік вартості</b><span>USD та гривня по налаштовному курсу</span></div></div>
-      </section>
-
-      <section id="gallery-section" class="card section">
-        <div class="section-title">
-          <h2>Галерея</h2>
-          <button id="refreshGallery" class="secondary">Оновити</button>
         </div>
-        <div id="gallery" class="gallery"></div>
+        <div class="visual-shell" aria-label="Місце для головного візуалу">
+          <div class="visual-orbit one"></div>
+          <div class="visual-orbit two"></div>
+          <div class="visual-card main-visual">
+            <div class="visual-placeholder">Ваш hero-візуал</div>
+            <p>Замініть цей блок власним зображенням у майбутньому — дизайн уже готовий під білий clean look.</p>
+          </div>
+          <div class="floating-note">Reference images + prompts</div>
+        </div>
       </section>
 
-      <section id="adminPanel" class="card section hidden">
-        <div class="section-title"><h2>Адмінка доступів</h2><span class="hint">Створюйте логіни та паролі для користувачів</span></div>
-        <div class="admin-grid">
+      <section id="landingInfo" class="info-grid">
+        <article class="info-card"><b>Чатова логіка</b><span>Промт → зображення → уточнення. Кожен новий візуал можна вести окремим чатом.</span></article>
+        <article class="info-card"><b>Власні референси</b><span>Додавайте до двох зображень, щоб обʼєднати візуали або внести точні правки.</span></article>
+        <article class="info-card"><b>Готово для команди</b><span>Профіль адміністратора керує користувачами та списком стилів для генератора.</span></article>
+      </section>
+    </main>
+
+    <main id="appPage" class="app-shell hidden">
+      <aside class="chat-history card">
+        <div class="history-head">
+          <div><h2>Історія чатів</h2><p>Окремий чат — окремий візуал.</p></div>
+          <button id="newChatBtn" class="primary">+ Новий</button>
+        </div>
+        <div id="chatList" class="chat-list"></div>
+      </aside>
+
+      <section class="chat-workspace card">
+        <div class="chat-top">
+          <div><h1 id="chatTitle">Новий візуал</h1><p>Працюйте з поточним зображенням у форматі діалогу.</p></div>
+          <span id="chatStatus" class="pill">Готово</span>
+        </div>
+        <div id="chatMessages" class="messages"></div>
+
+        <form id="generateForm" class="composer">
+          <div class="attachment-row">
+            <label class="upload-tile" for="referenceFiles">
+              <input id="referenceFiles" type="file" accept="image/*" multiple />
+              <span>＋ Додати до 2 референсів</span>
+            </label>
+            <div id="attachmentPreview" class="attachment-preview"></div>
+          </div>
+
+          <textarea id="prompt" placeholder="Опишіть, що потрібно створити або змінити у поточному візуалі..."></textarea>
+
+          <details class="settings-panel">
+            <summary>Налаштування генерації</summary>
+            <div class="settings-grid">
+              <div class="field">
+                <label>Співвідношення сторін</label>
+                <div id="ratios" class="ratio-grid">
+                  <button type="button" class="ratio active" data-ratio="1:1"><span class="ratio-shape"></span>1:1</button>
+                  <button type="button" class="ratio" data-ratio="16:9"><span class="ratio-shape"></span>16:9</button>
+                  <button type="button" class="ratio" data-ratio="9:16"><span class="ratio-shape"></span>9:16</button>
+                  <button type="button" class="ratio" data-ratio="4:3"><span class="ratio-shape"></span>4:3</button>
+                  <button type="button" class="ratio" data-ratio="3:4"><span class="ratio-shape"></span>3:4</button>
+                </div>
+              </div>
+              <div class="field">
+                <label for="imageSize">Роздільна здатність</label>
+                <select id="imageSize"><option value="1K">1024 × 1024 (1K)</option><option value="2K">2K</option><option value="4K">4K</option></select>
+              </div>
+              <div class="field">
+                <label for="count">Кількість зображень</label>
+                <div class="range-row"><input id="count" type="range" min="1" max="4" value="1" /><input id="countNumber" type="number" min="1" max="4" value="1" /></div>
+              </div>
+              <div class="field">
+                <label for="style">Стиль</label>
+                <select id="style"><option value="">Оберіть стиль</option></select>
+              </div>
+            </div>
+          </details>
+
+          <button id="generateBtn" class="generate" type="submit">✦ Згенерувати</button>
+        </form>
+      </section>
+    </main>
+
+    <main id="profilePage" class="container profile-page hidden">
+      <section class="card section">
+        <div class="section-title"><div><h1>Профіль</h1><p class="hint">Керування доступами, користувачами та стилями генерації.</p></div></div>
+        <div id="profileInfo" class="profile-info">
+          <b>Ваш робочий простір активний.</b>
+          <span>Поверніться на головну сторінку, щоб працювати з генератором і історією чатів.</span>
+        </div>
+        <div id="adminAccess" class="admin-grid hidden">
           <form id="createUserForm" class="card form-card">
+            <h2>Новий доступ</h2>
             <div class="field"><label for="newUsername">Логін</label><input id="newUsername" placeholder="client-name" /></div>
             <div class="field"><label for="newPassword">Пароль</label><input id="newPassword" type="password" placeholder="мінімум 6 символів" /></div>
             <div class="field"><label for="newRole">Роль</label><select id="newRole"><option value="user">Користувач</option><option value="admin">Адмін</option></select></div>
             <button class="generate" type="submit">Створити доступ</button>
           </form>
-          <div class="card form-card"><table class="table"><thead><tr><th>Логін</th><th>Роль</th><th>Статус</th><th></th></tr></thead><tbody id="usersTable"></tbody></table></div>
+          <div class="card form-card"><h2>Користувачі</h2><table class="table"><thead><tr><th>Логін</th><th>Роль</th><th>Статус</th><th></th></tr></thead><tbody id="usersTable"></tbody></table></div>
         </div>
       </section>
 
-      <section id="about" class="section"><h2>Про MVP</h2><p class="hint">Це стартова версія для VPS: без зовнішньої бази, з JSON-сховищем, сесіями, адмінкою та інтеграцією OpenRouter.</p></section>
-      <section id="faq" class="section"><h2>FAQ</h2><p class="hint">Для реальної генерації додайте OPENROUTER_API_KEY у .env. Без ключа працює mock-режим для перевірки інтерфейсу.</p></section>
+      <section id="styleAdmin" class="card section hidden">
+        <div class="section-title"><div><h2>Стилі генерації</h2><p class="hint">Редагуйте список стилів, який бачать користувачі в чаті.</p></div></div>
+        <form id="stylesForm" class="style-editor">
+          <textarea id="stylesEditor" placeholder="Один стиль у рядок"></textarea>
+          <button class="primary" type="submit">Зберегти стилі</button>
+        </form>
+      </section>
     </main>
 
     <div id="loginModal" class="modal hidden">
       <form id="loginForm" class="modal-panel">
-        <h2>Вхід до ImageGen</h2>
-        <p>Адмін за замовчуванням для локального тесту: admin / admin123. На VPS змініть пароль через .env.</p>
+        <h2>Вхід до Baziuk Generation</h2>
+        <p>Увійдіть, щоб відкрити генератор, історію чатів і профіль.</p>
         <div class="field"><label for="username">Логін</label><input id="username" autocomplete="username" /></div>
         <div class="field"><label for="password">Пароль</label><input id="password" type="password" autocomplete="current-password" /></div>
         <div class="modal-actions"><button type="button" id="closeLogin" class="secondary">Скасувати</button><button class="primary" type="submit">Увійти</button></div>
