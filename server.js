@@ -19,6 +19,7 @@ const OUTPUT_PRICE_PER_M = Number(process.env.MODEL_OUTPUT_PRICE_PER_MILLION || 
 const SESSION_SECRET = process.env.SESSION_SECRET || 'dev-secret-change-me';
 const ADMIN_USERNAME = process.env.ADMIN_USERNAME || 'admin';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
+const DEFAULT_STYLES = ['Комерційний банер', 'Реалістична фотографія', 'Мінімалістичний UI', '3D ілюстрація', 'Кінематографічний'];
 
 const mimeTypes = {
   '.html': 'text/html; charset=utf-8',
@@ -38,13 +39,19 @@ async function ensureStorage() {
     await stat(DB_FILE);
   } catch {
     const admin = createUserRecord(ADMIN_USERNAME, ADMIN_PASSWORD, 'admin');
-    await writeJson(DB_FILE, { users: [admin], generations: [], sessions: [] });
+    await writeJson(DB_FILE, { users: [admin], generations: [], sessions: [], settings: { styles: DEFAULT_STYLES } });
   }
 }
 
 async function readDb() {
   await ensureStorage();
-  return JSON.parse(await readFile(DB_FILE, 'utf8'));
+  const db = JSON.parse(await readFile(DB_FILE, 'utf8'));
+  db.users ||= [];
+  db.generations ||= [];
+  db.sessions ||= [];
+  db.settings ||= {};
+  db.settings.styles = Array.isArray(db.settings.styles) && db.settings.styles.length ? db.settings.styles : DEFAULT_STYLES;
+  return db;
 }
 
 async function writeDb(db) {
@@ -148,15 +155,15 @@ function buildPrompt({ prompt, aspectRatio, imageSize, style }) {
   return parts.join('\n');
 }
 
-async function callOpenRouter({ prompt, aspectRatio, imageSize, referenceImageUrl }) {
+async function callOpenRouter({ prompt, aspectRatio, imageSize, referenceImageUrls = [] }) {
   if (!process.env.OPENROUTER_API_KEY) {
     return mockGeneration({ prompt, aspectRatio, imageSize });
   }
 
-  const content = referenceImageUrl
+  const content = referenceImageUrls.length
     ? [
-        { type: 'text', text: `${prompt}\nВикористай прикріплене зображення як референс і внеси описані правки.` },
-        { type: 'image_url', image_url: { url: referenceImageUrl } },
+        { type: 'text', text: `${prompt}\nВикористай прикріплені зображення як контекст: поточний візуал чату та/або додані референси. Внеси описані правки або обʼєднай візуали згідно із промтом.` },
+        ...referenceImageUrls.map((url) => ({ type: 'image_url', image_url: { url } })),
       ]
     : prompt;
 
@@ -166,7 +173,7 @@ async function callOpenRouter({ prompt, aspectRatio, imageSize, referenceImageUr
       Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
       'Content-Type': 'application/json',
       'HTTP-Referer': process.env.APP_URL || 'http://localhost:3000',
-      'X-Title': process.env.APP_TITLE || 'ImageGen UA',
+      'X-Title': process.env.APP_TITLE || 'Baziuk Generation',
     },
     body: JSON.stringify({
       model: OPENROUTER_MODEL,
@@ -201,13 +208,17 @@ async function callOpenRouter({ prompt, aspectRatio, imageSize, referenceImageUr
   };
 }
 
+function isDataUrl(value) {
+  return typeof value === 'string' && /^data:image\/[\w.+-]+;base64,/.test(value);
+}
+
 function extractDataUrl(content) {
   if (typeof content !== 'string') return null;
   return content.match(/data:image\/[a-zA-Z0-9.+-]+;base64,[A-Za-z0-9+/=]+/)?.[0] || null;
 }
 
 async function mockGeneration({ prompt, aspectRatio, imageSize }) {
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024"><defs><linearGradient id="g" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#111827"/><stop offset="1" stop-color="#64748b"/></linearGradient></defs><rect width="1024" height="1024" rx="56" fill="url(#g)"/><circle cx="790" cy="210" r="120" fill="#ffffff" opacity=".12"/><circle cx="240" cy="740" r="180" fill="#ffffff" opacity=".08"/><text x="72" y="116" fill="#fff" font-family="Arial" font-size="42" font-weight="700">ImageGen MVP</text><text x="72" y="184" fill="#e5e7eb" font-family="Arial" font-size="26">${escapeXml(aspectRatio)} · ${escapeXml(imageSize)}</text><foreignObject x="72" y="300" width="880" height="360"><div xmlns="http://www.w3.org/1999/xhtml" style="font-family:Arial;color:white;font-size:34px;line-height:1.25;font-weight:700;">${escapeXml(prompt).slice(0, 220)}</div></foreignObject><text x="72" y="930" fill="#d1d5db" font-family="Arial" font-size="24">Mock mode: додайте OPENROUTER_API_KEY для реальної генерації</text></svg>`;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024"><defs><linearGradient id="g" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#111827"/><stop offset="1" stop-color="#64748b"/></linearGradient></defs><rect width="1024" height="1024" rx="56" fill="url(#g)"/><circle cx="790" cy="210" r="120" fill="#ffffff" opacity=".12"/><circle cx="240" cy="740" r="180" fill="#ffffff" opacity=".08"/><text x="72" y="116" fill="#fff" font-family="Arial" font-size="42" font-weight="700">Baziuk Generation</text><text x="72" y="184" fill="#e5e7eb" font-family="Arial" font-size="26">${escapeXml(aspectRatio)} · ${escapeXml(imageSize)}</text><foreignObject x="72" y="300" width="880" height="360"><div xmlns="http://www.w3.org/1999/xhtml" style="font-family:Arial;color:white;font-size:34px;line-height:1.25;font-weight:700;">${escapeXml(prompt).slice(0, 220)}</div></foreignObject><text x="72" y="930" fill="#d1d5db" font-family="Arial" font-size="24">Mock mode: додайте OPENROUTER_API_KEY для реальної генерації</text></svg>`;
   return {
     dataUrl: `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`,
     model: `${OPENROUTER_MODEL} (mock)`,
@@ -232,6 +243,7 @@ async function saveDataUrl(dataUrl) {
 }
 
 async function dataUrlFromPublicPath(publicPath) {
+  if (isDataUrl(publicPath)) return publicPath;
   const safePath = normalize(publicPath.replace(/^\/+/, ''));
   if (!safePath.startsWith('uploads/')) throw new Error('Invalid reference image path');
   const fullPath = join(DATA_DIR, safePath);
@@ -268,6 +280,12 @@ async function handleApi(req, res, path) {
   }
 
   if (path === '/api/me') return sendJson(res, 200, { user: publicUser(user) });
+
+  if (path === '/api/settings' && req.method === 'GET') {
+    const db = await readDb();
+    return sendJson(res, 200, { styles: db.settings.styles });
+  }
+
   if (!user) return sendError(res, 401, 'Потрібно увійти в систему');
 
   if (path === '/api/generate' && req.method === 'POST') {
@@ -276,20 +294,25 @@ async function handleApi(req, res, path) {
     const aspectRatio = body.aspectRatio || '1:1';
     const imageSize = body.imageSize || '1K';
     const prompt = buildPrompt({ prompt: body.prompt, aspectRatio, imageSize, style: body.style });
-    const referenceImageUrl = body.referenceImage ? await dataUrlFromPublicPath(body.referenceImage) : null;
-    const generated = await callOpenRouter({ prompt, aspectRatio, imageSize, referenceImageUrl });
+    const requestedReferences = [body.referenceImage, ...(Array.isArray(body.referenceImages) ? body.referenceImages : [])].filter(Boolean).slice(0, 3);
+    const referenceImageUrls = [];
+    for (const reference of requestedReferences) referenceImageUrls.push(await dataUrlFromPublicPath(reference));
+    const generated = await callOpenRouter({ prompt, aspectRatio, imageSize, referenceImageUrls });
     const imageUrl = await saveDataUrl(generated.dataUrl);
     const record = {
       id: randomId('gen'),
       userId: user.id,
       username: user.username,
       prompt: body.prompt,
+      chatId: body.chatId || randomId('chat'),
+      chatTitle: body.chatTitle || body.prompt.slice(0, 64),
       normalizedPrompt: prompt,
       aspectRatio,
       imageSize,
       style: body.style || '',
       imageUrl,
       referenceImage: body.referenceImage || null,
+      referenceImagesCount: requestedReferences.length,
       model: generated.model,
       cost: generated.cost,
       providerMessage: generated.providerMessage,
@@ -320,6 +343,16 @@ async function handleApi(req, res, path) {
       await writeDb(db);
       return sendJson(res, 201, { user: publicUser(created) });
     }
+  }
+
+  if (path === '/api/admin/styles' && user.role === 'admin' && req.method === 'PUT') {
+    const body = await readBody(req);
+    const styles = Array.isArray(body.styles) ? body.styles.map((item) => String(item).trim()).filter(Boolean).slice(0, 60) : [];
+    if (!styles.length) return sendError(res, 400, 'Додайте хоча б один стиль');
+    const db = await readDb();
+    db.settings.styles = [...new Set(styles)];
+    await writeDb(db);
+    return sendJson(res, 200, { styles: db.settings.styles });
   }
 
   if (path.startsWith('/api/admin/users/') && user.role === 'admin' && req.method === 'PATCH') {
@@ -372,9 +405,9 @@ const server = createServer(async (req, res) => {
 if (import.meta.url === pathToFileURL(process.argv[1] || '').href) {
   await ensureStorage();
   server.listen(PORT, () => {
-    console.log(`ImageGen MVP is running on http://localhost:${PORT}`);
+    console.log(`Baziuk Generation is running on http://localhost:${PORT}`);
     if (!process.env.OPENROUTER_API_KEY) console.log('OPENROUTER_API_KEY is not set: mock generation mode is enabled.');
   });
 }
 
-export { buildPrompt, costFromUsage, createUserRecord, verifyPassword, extractDataUrl };
+export { buildPrompt, costFromUsage, createUserRecord, verifyPassword, extractDataUrl, isDataUrl };

@@ -1,10 +1,10 @@
-const state = { user: null, aspectRatio: '1:1', gallery: [] };
+const defaultStyles = ['Комерційний банер', 'Реалістична фотографія', 'Мінімалістичний UI', '3D ілюстрація', 'Кінематографічний'];
+const state = { user: null, aspectRatio: '1:1', gallery: [], chats: [], activeChatId: null, attachments: [], styles: defaultStyles };
 
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
 
 const promptInput = $('#prompt');
-const counter = $('#counter');
 const count = $('#count');
 const countNumber = $('#countNumber');
 const loginModal = $('#loginModal');
@@ -26,57 +26,127 @@ async function api(path, options = {}) {
   return data;
 }
 
+function routeTo(path) {
+  history.pushState({}, '', path);
+  renderRoute();
+}
+
+function renderRoute() {
+  const path = window.location.pathname;
+  const showProfile = path === '/profile';
+  $('#landingPage').classList.toggle('hidden', Boolean(state.user));
+  $('#appPage').classList.toggle('hidden', !state.user || showProfile);
+  $('#profilePage').classList.toggle('hidden', !state.user || !showProfile);
+  if (showProfile && !state.user) loginModal.classList.remove('hidden');
+  if (showProfile && state.user?.role === 'admin') loadUsers().catch((error) => notify(error.message));
+}
+
 function setUser(user) {
   state.user = user;
   $('#loginOpen').classList.toggle('hidden', Boolean(user));
+  $('#profileLink').classList.toggle('hidden', !user);
   $('#logoutBtn').classList.toggle('hidden', !user);
-  $('#adminLink').classList.toggle('hidden', user?.role !== 'admin');
-  $('#adminPanel').classList.toggle('hidden', user?.role !== 'admin');
-  if (user?.role === 'admin') loadUsers();
+  $('#styleAdmin').classList.toggle('hidden', user?.role !== 'admin');
+  $('#adminAccess').classList.toggle('hidden', user?.role !== 'admin');
+  $('#profileInfo').classList.toggle('hidden', user?.role === 'admin');
+  renderRoute();
 }
 
-function renderGeneration(item, compact = false) {
-  const card = document.createElement('article');
-  card.className = 'result-card';
-  card.innerHTML = `
-    <a href="${item.imageUrl}" target="_blank" rel="noreferrer"><img src="${item.imageUrl}" alt="${escapeHtml(item.prompt)}" /></a>
-    <div class="result-meta">
-      <div class="cost"><span class="pill">$${Number(item.cost?.usd || 0).toFixed(6)}</span><span class="pill">₴${Number(item.cost?.uah || 0).toFixed(2)}</span>${item.mocked ? '<span class="pill">mock</span>' : ''}</div>
-      <p>${escapeHtml(item.prompt)}</p>
-      ${compact ? '' : `<p>${escapeHtml(item.aspectRatio)} · ${escapeHtml(item.imageSize)} · ${new Date(item.createdAt).toLocaleString('uk-UA')}</p>`}
-    </div>`;
-  return card;
+function escapeHtml(value) {
+  return String(value || '').replace(/[&<>'"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#039;', '"': '&quot;' }[char]));
 }
 
-function renderGallery(items = state.gallery) {
-  const gallery = $('#gallery');
-  gallery.innerHTML = '';
-  if (!items.length) {
-    gallery.innerHTML = '<div class="empty">Поки що немає зображень. Згенеруйте перший дизайн.</div>';
+function groupChats(items) {
+  const map = new Map();
+  items.forEach((item) => {
+    const chatId = item.chatId || item.id;
+    if (!map.has(chatId)) map.set(chatId, { id: chatId, title: item.chatTitle || item.prompt.slice(0, 64) || 'Новий візуал', items: [] });
+    map.get(chatId).items.push(item);
+  });
+  return [...map.values()].map((chat) => ({ ...chat, items: chat.items.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt)) }));
+}
+
+function ensureActiveChat() {
+  if (state.activeChatId && state.chats.some((chat) => chat.id === state.activeChatId)) return;
+  state.activeChatId = state.chats[0]?.id || `local_${Date.now()}`;
+  if (!state.chats.length) state.chats.push({ id: state.activeChatId, title: 'Новий візуал', items: [] });
+}
+
+function renderChats() {
+  ensureActiveChat();
+  const chatList = $('#chatList');
+  chatList.innerHTML = '';
+  state.chats.forEach((chat) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = `chat-item ${chat.id === state.activeChatId ? 'active' : ''}`;
+    button.dataset.chat = chat.id;
+    button.innerHTML = `<b>${escapeHtml(chat.title)}</b><span>${chat.items.length ? `${chat.items.length} генерацій` : 'Порожній чат'}</span>`;
+    chatList.append(button);
+  });
+  renderActiveChat();
+}
+
+function renderActiveChat() {
+  const chat = state.chats.find((item) => item.id === state.activeChatId);
+  $('#chatTitle').textContent = chat?.title || 'Новий візуал';
+  const messages = $('#chatMessages');
+  messages.innerHTML = '';
+  if (!chat?.items.length) {
+    messages.innerHTML = '<div class="empty welcome-message"><b>Почніть новий чат.</b><span>Напишіть промт унизу, додайте до двох референсів за потреби та згенеруйте перший візуал.</span></div>';
     return;
   }
-  items.forEach((item) => gallery.append(renderGeneration(item)));
-  const referenceSelect = $('#referenceImage');
-  referenceSelect.innerHTML = '<option value="">Нове зображення без референсу</option>';
-  items.slice(0, 30).forEach((item) => {
+  chat.items.forEach((item, index) => messages.append(renderMessage(item, index + 1)));
+  messages.scrollTop = messages.scrollHeight;
+}
+
+function renderMessage(item, index) {
+  const article = document.createElement('article');
+  article.className = 'message-pair';
+  article.innerHTML = `
+    <div class="message user-message"><span>Промт ${index}</span><p>${escapeHtml(item.prompt)}</p></div>
+    <div class="message image-message">
+      <a href="${item.imageUrl}" target="_blank" rel="noreferrer"><img src="${item.imageUrl}" alt="${escapeHtml(item.prompt)}" /></a>
+      <div class="result-meta">
+        <div class="cost"><span class="pill">${escapeHtml(item.aspectRatio)}</span><span class="pill">${escapeHtml(item.imageSize)}</span>${item.style ? `<span class="pill">${escapeHtml(item.style)}</span>` : ''}${item.mocked ? '<span class="pill">mock</span>' : ''}</div>
+        <p>${new Date(item.createdAt).toLocaleString('uk-UA')}</p>
+      </div>
+    </div>`;
+  return article;
+}
+
+function renderStyles() {
+  const styleSelect = $('#style');
+  styleSelect.innerHTML = '<option value="">Оберіть стиль</option>';
+  state.styles.forEach((style) => {
     const option = document.createElement('option');
-    option.value = item.imageUrl;
-    option.textContent = `${item.prompt.slice(0, 52)} — ${new Date(item.createdAt).toLocaleDateString('uk-UA')}`;
-    referenceSelect.append(option);
+    option.value = style;
+    option.textContent = style;
+    styleSelect.append(option);
   });
+  $('#stylesEditor').value = state.styles.join('\n');
+}
+
+async function loadSettings() {
+  const data = await api('/api/settings');
+  state.styles = data.styles?.length ? data.styles : defaultStyles;
+  renderStyles();
 }
 
 async function loadGallery() {
   if (!state.user) {
-    renderGallery([]);
-    return;
+    state.gallery = [];
+    state.chats = [];
+    return renderChats();
   }
   const data = await api('/api/gallery');
   state.gallery = data.generations || [];
-  renderGallery();
+  state.chats = groupChats(state.gallery);
+  renderChats();
 }
 
 async function loadUsers() {
+  if (state.user?.role !== 'admin') return;
   const data = await api('/api/admin/users');
   const table = $('#usersTable');
   table.innerHTML = '';
@@ -87,11 +157,28 @@ async function loadUsers() {
   });
 }
 
-function escapeHtml(value) {
-  return String(value || '').replace(/[&<>'"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#039;', '"': '&quot;' }[char]));
+async function fileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve({ name: file.name, dataUrl: reader.result });
+    reader.onerror = () => reject(new Error('Не вдалося прочитати файл'));
+    reader.readAsDataURL(file);
+  });
 }
 
-promptInput.addEventListener('input', () => { counter.textContent = `${promptInput.value.length}/1000`; });
+function renderAttachments() {
+  const preview = $('#attachmentPreview');
+  preview.innerHTML = '';
+  state.attachments.forEach((file, index) => {
+    const item = document.createElement('button');
+    item.type = 'button';
+    item.className = 'attachment-thumb';
+    item.dataset.removeAttachment = index;
+    item.innerHTML = `<img src="${file.dataUrl}" alt="${escapeHtml(file.name)}" /><span>×</span>`;
+    preview.append(item);
+  });
+}
+
 count.addEventListener('input', () => { countNumber.value = count.value; });
 countNumber.addEventListener('input', () => { count.value = countNumber.value; });
 
@@ -101,10 +188,40 @@ $$('.ratio').forEach((button) => button.addEventListener('click', () => {
   state.aspectRatio = button.dataset.ratio;
 }));
 
+$('#homeLink').addEventListener('click', () => routeTo('/'));
 $('#loginOpen').addEventListener('click', () => loginModal.classList.remove('hidden'));
+$('#landingLogin').addEventListener('click', () => loginModal.classList.remove('hidden'));
+$('#landingDemo').addEventListener('click', () => $('#landingInfo').scrollIntoView({ behavior: 'smooth' }));
 $('#closeLogin').addEventListener('click', () => loginModal.classList.add('hidden'));
-$('#adminLink').addEventListener('click', () => document.querySelector('#adminPanel').scrollIntoView({ behavior: 'smooth' }));
-$('#refreshGallery').addEventListener('click', () => loadGallery().catch((error) => notify(error.message)));
+$('#profileLink').addEventListener('click', () => routeTo('/profile'));
+
+$('#chatList').addEventListener('click', (event) => {
+  const button = event.target.closest('[data-chat]');
+  if (!button) return;
+  state.activeChatId = button.dataset.chat;
+  renderChats();
+});
+
+$('#newChatBtn').addEventListener('click', () => {
+  const chat = { id: `local_${Date.now()}`, title: 'Новий візуал', items: [] };
+  state.chats.unshift(chat);
+  state.activeChatId = chat.id;
+  renderChats();
+});
+
+$('#referenceFiles').addEventListener('change', async (event) => {
+  const files = [...event.target.files].slice(0, 2);
+  state.attachments = await Promise.all(files.map(fileToDataUrl));
+  renderAttachments();
+  event.target.value = '';
+});
+
+$('#attachmentPreview').addEventListener('click', (event) => {
+  const button = event.target.closest('[data-remove-attachment]');
+  if (!button) return;
+  state.attachments.splice(Number(button.dataset.removeAttachment), 1);
+  renderAttachments();
+});
 
 $('#loginForm').addEventListener('submit', async (event) => {
   event.preventDefault();
@@ -112,8 +229,9 @@ $('#loginForm').addEventListener('submit', async (event) => {
     const data = await api('/api/login', { method: 'POST', body: JSON.stringify({ username: $('#username').value, password: $('#password').value }) });
     setUser(data.user);
     loginModal.classList.add('hidden');
+    routeTo('/');
     notify(`Вітаю, ${data.user.username}!`);
-    await loadGallery();
+    await Promise.all([loadSettings(), loadGallery()]);
   } catch (error) { notify(error.message); }
 });
 
@@ -121,7 +239,8 @@ $('#logoutBtn').addEventListener('click', async () => {
   await api('/api/logout', { method: 'POST' });
   setUser(null);
   state.gallery = [];
-  renderGallery([]);
+  state.chats = [];
+  routeTo('/');
   notify('Ви вийшли із системи');
 });
 
@@ -132,38 +251,47 @@ $('#generateForm').addEventListener('submit', async (event) => {
     notify('Спочатку увійдіть у систему');
     return;
   }
+  if (promptInput.value.trim().length < 3) return notify('Опишіть зображення детальніше');
+
   const btn = $('#generateBtn');
-  const results = $('#results');
-  const dropzone = $('#dropzone');
+  const status = $('#chatStatus');
   btn.disabled = true;
   btn.textContent = 'Генерація...';
-  results.classList.remove('hidden');
-  dropzone.classList.add('hidden');
-  results.innerHTML = '<div class="empty">Модель створює зображення, зачекайте...</div>';
+  status.textContent = 'Генеруємо';
+  const chatId = state.activeChatId || `local_${Date.now()}`;
+  const currentChat = state.chats.find((chat) => chat.id === chatId);
+  const referenceFromChat = currentChat?.items.at(-1)?.imageUrl || '';
+
   try {
     const requests = Array.from({ length: Number(count.value) }, () => api('/api/generate', {
       method: 'POST',
       body: JSON.stringify({
         prompt: promptInput.value,
+        chatId,
+        chatTitle: currentChat?.items.length ? currentChat.title : promptInput.value.slice(0, 64),
         aspectRatio: state.aspectRatio,
         imageSize: $('#imageSize').value,
         style: $('#style').value,
-        referenceImage: $('#referenceImage').value,
+        referenceImage: referenceFromChat,
+        referenceImages: state.attachments.map((item) => item.dataUrl),
       }),
     }));
     const generated = await Promise.all(requests);
     const items = generated.map((item) => item.generation);
-    results.innerHTML = '';
-    items.forEach((item) => results.append(renderGeneration(item, true)));
     state.gallery = [...items, ...state.gallery];
-    renderGallery();
-    notify('Готово! Зображення додано в галерею.');
+    state.chats = groupChats(state.gallery);
+    state.activeChatId = items[0].chatId;
+    promptInput.value = '';
+    state.attachments = [];
+    renderAttachments();
+    renderChats();
+    notify('Готово! Візуал додано в чат.');
   } catch (error) {
-    results.innerHTML = `<div class="empty">${escapeHtml(error.message)}</div>`;
     notify(error.message);
   } finally {
     btn.disabled = false;
-    btn.textContent = '✦ Згенерувати зображення';
+    btn.textContent = '✦ Згенерувати';
+    status.textContent = 'Готово';
   }
 });
 
@@ -186,13 +314,27 @@ $('#usersTable').addEventListener('click', async (event) => {
   } catch (error) { notify(error.message); }
 });
 
+$('#stylesForm').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  try {
+    const styles = $('#stylesEditor').value.split('\n').map((item) => item.trim()).filter(Boolean);
+    const data = await api('/api/admin/styles', { method: 'PUT', body: JSON.stringify({ styles }) });
+    state.styles = data.styles;
+    renderStyles();
+    notify('Стилі оновлено');
+  } catch (error) { notify(error.message); }
+});
+
+window.addEventListener('popstate', renderRoute);
+
 (async function init() {
+  await loadSettings().catch(() => renderStyles());
   try {
     const data = await api('/api/me');
     setUser(data.user);
-    await loadGallery();
+    if (data.user) await loadGallery();
+    else renderRoute();
   } catch {
     setUser(null);
-    renderGallery([]);
   }
 })();
