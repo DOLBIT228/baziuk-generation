@@ -1,0 +1,21 @@
+{
+  "name": "baziuk-generation",
+  "version": "0.1.0",
+  "description": "MVP image generation service with OpenRouter, admin access, gallery and cost tracking.",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "node --test tests/*.test.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "keywords": [
+    "openrouter",
+    "image-generation",
+    "mvp"
+  ],
+  "license": "MIT"
+}

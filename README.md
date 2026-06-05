@@ -1,1 +1,60 @@
-# baziuk-generation
+# ImageGen MVP
+
+MVP сервісу для генерації візуалів через OpenRouter на моделі `google/gemini-3-pro-image-preview`.
+
+## Що входить
+
+- Авторизація за логіном і паролем через HTTP-only cookie session.
+- Адмінка для створення користувачів, видачі доступів та вимкнення акаунтів.
+- Генерація нових зображень через OpenRouter Chat Completions API.
+- Режим правок: можна вибрати попереднє зображення з галереї як референс і описати зміни.
+- Галерея збережених дизайнів у `data/uploads`.
+- Розрахунок вартості генерації в USD та грн на базі usage токенів OpenRouter.
+- Mock-режим без API-ключа, щоб перевірити інтерфейс і VPS-деплой без витрат.
+
+## Швидкий старт локально
+
+```bash
+cp .env.example .env
+# заповніть OPENROUTER_API_KEY для реальних генерацій
+npm start
+```
+
+Відкрийте `http://localhost:3000`.
+
+Адмін для першого локального входу за замовчуванням:
+
+- логін: `admin`
+- пароль: `admin123`
+
+> На VPS обов'язково встановіть власні `ADMIN_PASSWORD` та `SESSION_SECRET` перед першим запуском.
+
+## Налаштування середовища
+
+| Змінна | Призначення |
+| --- | --- |
+| `OPENROUTER_API_KEY` | API ключ OpenRouter. Якщо відсутній — працює mock-режим. |
+| `SESSION_SECRET` | Секрет для підпису cookie-сесій. |
+| `ADMIN_USERNAME` | Логін першого адміністратора. |
+| `ADMIN_PASSWORD` | Пароль першого адміністратора. |
+| `APP_URL` | URL сайту для заголовка `HTTP-Referer` в OpenRouter. |
+| `APP_TITLE` | Назва додатку для заголовка `X-Title` в OpenRouter. |
+| `USD_UAH_RATE` | Курс для перерахунку USD у гривню. |
+| `MODEL_INPUT_PRICE_PER_MILLION` | Ціна input токенів за 1M. За замовчуванням `2`. |
+| `MODEL_OUTPUT_PRICE_PER_MILLION` | Ціна output токенів за 1M. За замовчуванням `12`. |
+| `PORT` | Порт HTTP сервера. За замовчуванням `3000`. |
+
+## Деплой на VPS
+
+1. Встановіть Node.js 20+.
+2. Скопіюйте репозиторій на сервер.
+3. Створіть `.env` з production-секретами.
+4. Запустіть `npm start` або process manager, наприклад `pm2 start server.js --name imagegen`.
+5. Поставте Nginx/Caddy reverse proxy на `http://127.0.0.1:3000`.
+6. Забезпечте backup директорії `data/`, бо там JSON-база і зображення.
+
+## Тести
+
+```bash
+npm test
+```
